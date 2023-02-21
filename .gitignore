@@ -2,8 +2,15 @@
 .Rhistory
 .Rapp.history
 
+# Large data folders
+input/
+hmm_files/
+move_files/
+sf_files/
+
 # Session Data files
 .RData
+.DS_Store
 
 # User-specific files
 .Ruserdata
