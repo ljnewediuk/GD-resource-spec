@@ -1,4 +1,7 @@
 
+# 01 Get Study IDs ====
+# Make list of Movebank studies with mammal data
+
 library(tidyverse)
 library(move)
 
@@ -38,8 +41,7 @@ if(file.exists('output/movebank_species_classes.rds')) {
 }
 
 # Filter terrestrial mammals from taxa and remove any with number of animals < 5
-#   Need to go through and accept terms for all studies we need to download from
-#   on the website
+# Also remove domestic species, humans, and marine mammals
 MV_mamms <- MV_taxa %>%
   left_join(taxon_list) %>%
   filter(class == 'Mammalia',
@@ -49,7 +51,13 @@ MV_mamms <- MV_taxa %>%
                             'Balaenoptera musculus', 'Physeter macrocephalus',
                             'Balaena mysticetus', 'Pseudorca crassidens', 
                             'Odobenus rosmarus', 'Zalophus californianus',
-                            'Mirounga angustirostris'))
+                            'Mirounga angustirostris', 'Felis catus', 'Ovis aries'),
+         # Also remove this study, which seems to have some weird overlap between 
+         # raccoons and snapping turtles (1605024900), sensor issues (509393372),
+         # or no location data (40906102)
+         ! id %in% c(1605024900, 509393372, 40906102),
+         # Remove these studies for now because files too large
+         ! id %in% c(7023252, 53460105))
 
 # Save list of studies from which to download data
 saveRDS(MV_mamms, 'output/mammal_studies.rds')
