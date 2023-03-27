@@ -6,6 +6,7 @@
 # Call functions
 source('functions/SummarizeLandscape.R')
 source('functions/SummarizeMovement.R')
+source('functions/BufferLandscape.R')
 
 # Set up Earth Engine credentials
 ee_Initialize(user = 'j.newedi@gmail.com', drive = TRUE)
@@ -37,7 +38,7 @@ for(j in studies) {
   all_lc_data <- rbind(all_lc_data, study_summary)
 }
 
-# SUMMARIZE LANDSCAPE within 100% MCP encompassing all points from individual
+# SUMMARIZE MOVEMENT within 100% MCP encompassing all points from individual
 
 # Start data frame
 all_move_data <- data.frame()
@@ -51,7 +52,23 @@ for(j in studies) {
   
 }
 
+# BUFFER LANDSCAPE within buffer (in m) from centroid of all points in population
+# and CALCULATE MESH SIZE as measure of heterogeneity
+
+# Start data frame
+mesh_data <- data.frame()
+
+# Loop through studies
+for(k in studies) {
+  
+  study_summary <- lc_buffer(study = k, buff_size = 80000)
+  mesh_data <- rbind(mesh_data, study_summary)
+  
+}
+
+
 # SAVE
 saveRDS(all_move_data, 'output/movement_summary.rds')
 saveRDS(all_lc_data, 'output/lc_summary.rds')
+saveRDS(mesh_data, 'output/lc_pop_buffers.rds')
 
