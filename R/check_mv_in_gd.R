@@ -35,6 +35,8 @@ GD_dat <- read.csv('input/synthesized_geneticdiversity_dryad.csv') %>%
   left_join(hr_dat) %>%
   mutate(log_hr_km2 = log(mean_hr_km2))
   
+ggplot(GD_dat, aes(x = dispersal_km, y = global_fst)) + geom_point() + geom_smooth(method = 'lm')
+summary(lm(global_fst ~ dispersal_km, data = GD_dat))
 
 ggplot(GD_dat, aes(x = log_hr_km2, y = global_fst)) + geom_point() + geom_smooth(method = 'lm')
 summary(lm(global_fst ~ log_hr_km2, data = GD_dat))
