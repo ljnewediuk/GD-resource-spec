@@ -9,9 +9,40 @@ MV_dat <- getMovebank('study')
 dens_dat <- read.csv('input/TetraDENSITY.csv') %>%
   mutate(species = paste(Genus, Species, sep = ' '))
 
+# Dispersal distance data
+disp_dat <- read.csv('input/dispersal_distance_data_whitmee_2013.csv') %>%
+  mutate(species = gsub(' ', '_', Species)) %>%
+  mutate(Value = ifelse(Units == 'Metres - Linear', Value/1000, Value)) %>%
+  mutate(Value = ifelse(Units == 'Miles - Linear', Value*1.60934, Value)) %>%
+  select(species, Value) %>%
+  group_by(species) %>%
+  summarize(dispersal_km = mean(Value))
+
+# Home range size data
+hr_dat <- read.csv('input/hr_size_data_broekman_et_al_2022/HomeRangeData_2022_11_11.csv') %>%
+  mutate(species = gsub(' ', '_', Species)) %>%
+  group_by(species, HR_Level, HR_Span) %>%
+  summarize(mean_hr_km2 = mean(Home_Range_km2)) %>%
+  filter(HR_Span %in% grep('Seasonal', unique(HR_Span), value = TRUE),
+         HR_Level == 'Individual') %>%
+  summarize(mean_hr_km2 = mean(mean_hr_km2)) 
+
 # Load names of species with GD data
 # GD_dat <- read.delim('input/chloe_mammals_list.txt')
 GD_dat <- read.csv('input/synthesized_geneticdiversity_dryad.csv') %>%
+  select(species, global_fst) %>%
+  left_join(disp_dat) %>%
+  left_join(hr_dat) %>%
+  mutate(log_hr_km2 = log(mean_hr_km2))
+  
+
+ggplot(GD_dat, aes(x = log_hr_km2, y = global_fst)) + geom_point() + geom_smooth(method = 'lm')
+summary(lm(global_fst ~ log_hr_km2, data = GD_dat))
+
+
+
+
+
   dplyr::select(species) %>%
   distinct() %>%
   # Remove underscores
