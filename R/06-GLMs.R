@@ -8,9 +8,12 @@ library(modelr)
 # 06 Models ====
 # Model movement (speed and HR area) on heterogeneity and pet
 
-# Load data
-dat <- readRDS('output/prepped_data.rds') %>%
+# Load movement ~ environment data
+move_dat <- readRDS('output/prepped_data.rds') %>%
   mutate(study = factor(study))
+
+# Load fst data
+fst_dat <- readRDS('output/prepped_fst_data.rds')
 
 # List of bat species
 bats <- c('tadarida_brasiliensis', 'carollia_castanea', 'vespertilio_murinus',
@@ -20,12 +23,10 @@ bats <- c('tadarida_brasiliensis', 'carollia_castanea', 'vespertilio_murinus',
           'hypsignathus_monstrosus', 'pteropus_melanotus', 'pteropus_alecto', 
           'nyctalus_noctula') 
 
-# Data frame of log adult mass
-mass_dat <- dat %>%
-  ungroup() %>%
-  select(taxon, adult_mass_g) %>%
-  group_by(taxon) %>%
-  summarize(mass = mean(log(adult_mass_g)))
+# Pantheria for body mass
+panther <- read.csv('input/imputation_phylo_1.csv') %>%
+  mutate(taxon = tolower(gsub(' ', '_', phylacine_binomial))) %>%
+  select(taxon, adult_mass_g)
 
 # Function to fit models
 # Specify random slope and intercept varying among taxon and studies within taxon
@@ -42,40 +43,63 @@ fit_mod <- function(dat, fixed_eff, ran_eff, resp_var) {
 }
 
 # Fit models for habitat heterogeneity, habitat diversity, and evapotranspiration
-speed_het <- fit_mod(dat, 'hab_contrast_sc', '(hab_contrast_sc | taxon/study)', 'speed_log')
-speed_simps <- fit_mod(dat, 'simpsons_D_sc', '(simpsons_D_sc | taxon/study)', 'speed_log')
-speed_pet <- fit_mod(dat, 'pet_sc', '(pet_sc | taxon/study)', 'speed_log')
+speed_het <- fit_mod(move_dat, 'hab_contrast_sc', '(hab_contrast_sc | taxon/study)', 'speed_log')
+speed_simps <- fit_mod(move_dat, 'simpsons_D_sc', '(simpsons_D_sc | taxon/study)', 'speed_log')
+hr_het <- fit_mod(move_dat, 'hab_contrast_sc', '(hab_contrast_sc | taxon/study)', 'hr_area_log')
+hr_simps <- fit_mod(move_dat, 'simpsons_D_sc', '(simpsons_D_sc | taxon/study)', 'hr_area_log')
 
-# Population effects from models
-# WILL NOT WORK IN FUNCTION because spread_draws tries to evaluate a string
-# passed as an argument... Maybe the solution is to rename the variable name 
-# in the model within the function?
+# Fit models for Fst ~ dispersal distance and HR size
+fst_disp <- fit_mod(fst_dat, 'dispersal_km_sc', NULL, 'global_fst_sc')
+fst_hr <- fit_mod(fst_dat, 'log_hr_km2', NULL, 'global_fst_sc')
+
+# Posterior draws from fst models
+draws_fst_disp <- fst_dat |>
+  data_grid(dispersal_km_sc = seq_range(dispersal_km_sc, n = 1000))  |>
+  add_predicted_draws(object = fst_disp, ndraws = 10000)
+
+draws_fst_hr <- fst_dat |>
+  data_grid(log_hr_km2 = seq_range(log_hr_km2, n = 1000))  |>
+  add_predicted_draws(object = fst_hr, ndraws = 10000) 
+
+# Population effects from heterogeneity models
 
 speed_het_fixed <- speed_het %>%
   spread_draws(b_hab_contrast_sc) %>%
   median_qi(b_hab_contrast_sc) %>%
   rename('slope' = b_hab_contrast_sc) %>%
   select(slope, .lower, .upper) %>%
-  mutate(var = 'heterogeneity')
-
-speed_pet_fixed <- speed_pet %>%
-  spread_draws(b_pet_sc) %>%
-  median_qi(b_pet_sc) %>%
-  rename('slope' = b_pet_sc) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'evapotranspiration')
+  mutate(var = 'Habitat contrast',
+         response = 'speed')
 
 speed_simps_fixed <- speed_simps %>%
   spread_draws(b_simpsons_D_sc) %>%
   median_qi(b_simpsons_D_sc) %>%
   rename('slope' = b_simpsons_D_sc) %>%
   select(slope, .lower, .upper) %>%
-  mutate(var = 'habitat diversity')
+  mutate(var = 'Habitat diversity',
+         response = 'speed')
+
+hr_het_fixed <- hr_het %>%
+  spread_draws(b_hab_contrast_sc) %>%
+  median_qi(b_hab_contrast_sc) %>%
+  rename('slope' = b_hab_contrast_sc) %>%
+  select(slope, .lower, .upper) %>%
+  mutate(var = 'Habitat contrast',
+         response = 'hr')
+
+hr_simps_fixed <- hr_simps %>%
+  spread_draws(b_simpsons_D_sc) %>%
+  median_qi(b_simpsons_D_sc) %>%
+  rename('slope' = b_simpsons_D_sc) %>%
+  select(slope, .lower, .upper) %>%
+  mutate(var = 'Habitat diversity',
+         response = 'hr')
 
 # Bind together
 all_fixed_vars <- speed_het_fixed %>%
-  rbind(speed_pet_fixed) %>%
-  rbind(speed_simps_fixed)
+  rbind(speed_simps_fixed) %>%
+  rbind(hr_het_fixed) %>%
+  rbind(hr_simps_fixed)
 
 # Same for individual slopes... maybe rename the variable in the function?
 # Individual slopes
@@ -86,22 +110,10 @@ speed_het_vars <- speed_het %>%
   arrange(study) %>%
   group_by(study) %>% 
   summarize(mean_slope = mean(species_m), se_slope = sd(species_m)/sqrt(length(species_m))*1.96) %>%
-  mutate(var = 'heterogeneity') %>%
+  mutate(var = 'Habitat contrast',
+         response = 'speed') %>%
   rename('taxon' = study) %>%
-  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial')) %>%
-  left_join(mass_dat)
-
-speed_pet_vars <- speed_pet %>%
-  spread_draws(b_pet_sc, r_taxon[study, term]) %>%
-  mutate(species_m = b_pet_sc + r_taxon) %>%
-  filter(term == 'pet_sc') %>%
-  arrange(study) %>%
-  group_by(study) %>% 
-  summarize(mean_slope = mean(species_m), se_slope = sd(species_m)/sqrt(length(species_m))*1.96) %>%
-  mutate(var = 'evapotranspiration') %>%
-  rename('taxon' = study) %>%
-  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial')) %>%
-  left_join(mass_dat)
+  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial'))
 
 speed_simps_vars <- speed_simps %>%
   spread_draws(b_simpsons_D_sc, r_taxon[study, term]) %>%
@@ -110,33 +122,55 @@ speed_simps_vars <- speed_simps %>%
   arrange(study) %>%
   group_by(study) %>% 
   summarize(mean_slope = mean(species_m), se_slope = sd(species_m)/sqrt(length(species_m))*1.96) %>%
-  mutate(var = 'habitat diversity') %>%
+  mutate(var = 'Habitat diversity',
+         response = 'speed') %>%
   rename('taxon' = study) %>%
-  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial')) %>%
-  left_join(mass_dat)
+  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial'))
 
+hr_het_vars <- hr_het %>%
+  spread_draws(b_hab_contrast_sc, r_taxon[study, term]) %>%
+  mutate(species_m = b_hab_contrast_sc + r_taxon) %>%
+  filter(term == 'hab_contrast_sc') %>%
+  arrange(study) %>%
+  group_by(study) %>% 
+  summarize(mean_slope = mean(species_m), se_slope = sd(species_m)/sqrt(length(species_m))*1.96) %>%
+  mutate(var = 'Habitat contrast',
+         response = 'hr') %>%
+  rename('taxon' = study) %>%
+  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial'))
+
+hr_simps_vars <- hr_simps %>%
+  spread_draws(b_simpsons_D_sc, r_taxon[study, term]) %>%
+  mutate(species_m = b_simpsons_D_sc + r_taxon) %>%
+  filter(term == 'simpsons_D_sc') %>%
+  arrange(study) %>%
+  group_by(study) %>% 
+  summarize(mean_slope = mean(species_m), se_slope = sd(species_m)/sqrt(length(species_m))*1.96) %>%
+  mutate(var = 'Habitat diversity',
+         response = 'hr') %>%
+  rename('taxon' = study) %>%
+  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial'))
+
+# Bind together
 all_rand_vars <- speed_het_vars %>%
-  rbind(speed_pet_vars) %>%
-  rbind(speed_simps_vars)
+  rbind(speed_simps_vars) %>%
+  rbind(hr_het_vars) %>%
+  rbind(hr_simps_vars) %>%
+  left_join(panther)
 
-# Plot
-ggplot() + 
-  geom_hline(yintercept = 0) + 
-  geom_jitter(data = all_rand_vars, aes(x = var, y = mean_slope, colour = lifestyle, size = mass), 
-              alpha = 0.3) + 
-  scale_color_manual(values = c('#1e1d22', '#00ab66')) +
-  theme(axis.title.y = element_blank(),
-        legend.title = element_blank()) +
-  geom_linerange(data = all_fixed_vars, 
-                 aes(x = var, ymin = .lower, ymax = .upper),
-                 lwd = 2.5) +
-  geom_pointrange(data = all_fixed_vars,
-                  aes(x = var, y = slope, ymin = .lower, ymax = .upper),
-                  lwd = 1, shape = 21, fill = 'white', stroke = 3) +
-  coord_flip() + ylab('slope')
-
-
-# Save
+# Save models
 saveRDS(speed_het, 'model_files/speed_het.rds')
 saveRDS(speed_simps, 'model_files/speed_simps.rds')
 saveRDS(speed_pet, 'model_files/speed_pet.rds')
+saveRDS(hr_het, 'model_files/hr_het.rds')
+saveRDS(hr_simps, 'model_files/hr_simps.rds')
+saveRDS(hr_pet, 'model_files/hr_pet.rds')
+saveRDS(fst_disp, 'model_files/fst_disp.rds')
+saveRDS(fst_hr, 'model_files/fst_hr.rds')
+
+# Save posterior draws
+saveRDS(all_fixed_vars, 'output/movement_fixed_draws.rds')
+saveRDS(all_rand_vars, 'output/movement_rand_draws.rds')
+saveRDS(draws_fst_disp, 'output/fst_disp_draws.rds')
+saveRDS(draws_fst_hr, 'output/fst_hr_draws.rds')
+
