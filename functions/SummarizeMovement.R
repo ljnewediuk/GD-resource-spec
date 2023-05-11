@@ -42,7 +42,7 @@ summarize_mvmt <- function(type, study) {
                crs = sp::CRS("+proj=longlat +ellips=WGS84"), remove = F) %>%
       mutate(utm_crs = paste0("+proj=utm +zone=", 
                               (floor((location.long + 180) / 6) + 1), " ellps=WGS84"))
-    
+  
     # Summarize individual movement
     id_summary <- data.frame()
     for(j in unique(id_move$segment)) {
