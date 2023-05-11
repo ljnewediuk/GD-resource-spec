@@ -29,16 +29,18 @@ hr_dat <- read.csv('input/hr_size_data_broekman_et_al_2022/HomeRangeData_2022_11
 
 # Load names of species with GD data
 # GD_dat <- read.delim('input/chloe_mammals_list.txt')
-GD_dat <- read.csv('input/synthesized_geneticdiversity_dryad.csv') %>%
+GD_dat <- read.csv('input/fst_data_levi.csv') %>%
   select(species, global_fst) %>%
   left_join(disp_dat) %>%
   left_join(hr_dat) %>%
   mutate(log_hr_km2 = log(mean_hr_km2))
   
-ggplot(GD_dat, aes(x = dispersal_km, y = global_fst)) + geom_point() + geom_smooth(method = 'lm')
+ggplot(GD_dat, aes(x = dispersal_km, y = global_fst)) + geom_point() + geom_smooth(method = 'lm')  +
+  xlab('Dispersal distance (km)') + ylab('Global Fst')
 summary(lm(global_fst ~ dispersal_km, data = GD_dat))
 
-ggplot(GD_dat, aes(x = log_hr_km2, y = global_fst)) + geom_point() + geom_smooth(method = 'lm')
+ggplot(GD_dat, aes(x = log_hr_km2, y = global_fst)) + geom_point() + geom_smooth(method = 'lm')  +
+  xlab('Individual home range size (log km2)') + ylab('Global Fst')
 summary(lm(global_fst ~ log_hr_km2, data = GD_dat))
 
 
