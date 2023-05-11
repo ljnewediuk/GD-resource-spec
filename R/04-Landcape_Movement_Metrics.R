@@ -6,6 +6,7 @@
 # Call functions
 source('functions/SummarizeLandscape.R')
 source('functions/SummarizeMovement.R')
+source('functions/SummarizeHomeRanges.R')
 source('functions/BufferLandscape.R')
 
 # Set up Earth Engine credentials
@@ -52,6 +53,23 @@ for(j in studies) {
   
 }
 
+# SUMMARIZE DAILY HOME RANGE SIZE using average HR size surrounding individual points
+
+# Start data frame
+if(file.exists('output/hr_summary.rds')) {
+  all_hr_data <- readRDS('output/hr_summary.rds')
+} else {
+  all_hr_data <- data.frame()
+}
+
+# Loop through studies
+for(j in studies) {
+  
+  study_summary <- summarize_hrs(type = 'move', study = j)
+  all_hr_data <- rbind(all_hr_data, study_summary)
+  
+}
+
 # BUFFER LANDSCAPE within buffer (in m) from centroid of all points in population
 # and CALCULATE MESH SIZE as measure of heterogeneity
 
@@ -69,6 +87,7 @@ for(k in studies) {
 
 # SAVE
 saveRDS(all_move_data, 'output/movement_summary.rds')
+saveRDS(all_hr_data, 'output/hr_summary.rds')
 saveRDS(all_lc_data, 'output/lc_summary.rds')
 saveRDS(mesh_data, 'output/lc_pop_buffers.rds')
 
