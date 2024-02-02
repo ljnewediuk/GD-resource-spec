@@ -4,8 +4,10 @@
 
 # Large data folders
 input/
+output/
 hmm_files/
 move_files/
+model_files/
 sf_files/
 microsat_data/
 figures/
