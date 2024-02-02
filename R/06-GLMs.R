@@ -4,16 +4,11 @@ library(tidybayes)
 library(brms)
 library(emmeans)
 library(modelr)
+library(bayestestR)
+library(performance)
 
 # 06 Models ====
 # Model movement (speed and HR area) on heterogeneity and pet
-
-# Load movement ~ environment data
-move_dat <- readRDS('output/prepped_data.rds') %>%
-  mutate(study = factor(study))
-
-# Load fst data
-fst_dat <- readRDS('output/prepped_fst_data.rds')
 
 # List of bat species
 bats <- c('tadarida_brasiliensis', 'carollia_castanea', 'vespertilio_murinus',
@@ -23,10 +18,30 @@ bats <- c('tadarida_brasiliensis', 'carollia_castanea', 'vespertilio_murinus',
           'hypsignathus_monstrosus', 'pteropus_melanotus', 'pteropus_alecto', 
           'nyctalus_noctula') 
 
-# Pantheria for body mass
-panther <- read.csv('input/imputation_phylo_1.csv') %>%
-  mutate(taxon = tolower(gsub(' ', '_', phylacine_binomial))) %>%
-  select(taxon, adult_mass_g)
+# Load movement ~ environment data
+move_dat <- readRDS('output/prepped_data.rds') %>%
+  ungroup() %>%
+  # Add study as a factor
+  mutate(study = factor(study),
+         # Scale data collection interval and adult body mass
+         reg_time_sc = scale(reg_time)[,1],
+         adult_mass_g_sc = scale(adult_mass_g)[,1],
+         # Add factor for movement mode
+         move_mode = ifelse(taxon %in% bats, 'flying', 'ground'))
+
+# Save model data for later use
+saveRDS(move_dat, 'output/model_data.rds')
+
+# Sub data set excluding the longest 25 percentile of time intervals
+move_sub <- move_dat %>% 
+  # Convert all time intervals to hours
+  mutate(reg_time = ifelse(time_units == 'mins', reg_time/60, reg_time)) %>%
+  mutate(reg_time = ifelse(time_units == 'secs', reg_time/3600, reg_time)) %>%
+  # Exclude top 25 percentile
+  filter(reg_time < quantile(reg_time, probs = 0.75))
+
+# Load fst data
+fst_dat <- readRDS('output/prepped_fst_data.rds')
 
 # Function to fit models
 # Specify random slope and intercept varying among taxon and studies within taxon
@@ -42,135 +57,96 @@ fit_mod <- function(dat, fixed_eff, ran_eff, resp_var) {
   return(mod)
 }
 
+# MAIN TEXT MODELS
+
 # Fit models for habitat heterogeneity, habitat diversity, and evapotranspiration
 speed_het <- fit_mod(move_dat, 'hab_contrast_sc', '(hab_contrast_sc | taxon/study)', 'speed_log')
 speed_simps <- fit_mod(move_dat, 'simpsons_D_sc', '(simpsons_D_sc | taxon/study)', 'speed_log')
 hr_het <- fit_mod(move_dat, 'hab_contrast_sc', '(hab_contrast_sc | taxon/study)', 'hr_area_log')
 hr_simps <- fit_mod(move_dat, 'simpsons_D_sc', '(simpsons_D_sc | taxon/study)', 'hr_area_log')
+hr_pet <- fit_mod(move_dat, 'pet_sc', '(pet_sc | taxon/study)', 'hr_area_log')
+speed_pet <- fit_mod(move_dat, 'pet_sc', '(pet_sc | taxon/study)', 'speed_log')
 
 # Fit models for Fst ~ dispersal distance and HR size
 fst_disp <- fit_mod(fst_dat, 'dispersal_km_sc', NULL, 'global_fst_sc')
 fst_hr <- fit_mod(fst_dat, 'log_hr_km2', NULL, 'global_fst_sc')
 
-# Posterior draws from fst models
-draws_fst_disp <- fst_dat |>
-  data_grid(dispersal_km_sc = seq_range(dispersal_km_sc, n = 1000))  |>
-  add_predicted_draws(object = fst_disp, ndraws = 10000)
+# SUPPLEMENTARY MODELS
 
-draws_fst_hr <- fst_dat |>
-  data_grid(log_hr_km2 = seq_range(log_hr_km2, n = 1000))  |>
-  add_predicted_draws(object = fst_hr, ndraws = 10000) 
+# Fit models to test how time interval of data collection affects speed/hr size estimates
+hr_check <- fit_mod(move_dat, 'reg_time_sc', '(reg_time_sc | taxon/study)', 'hr_area_log')
+speed_check <- fit_mod(move_dat, 'reg_time_sc', '(reg_time_sc | taxon/study)', 'speed_log')
 
-# Population effects from heterogeneity models
+# Fit models for sub analysis to test whether excluding the top 25 percentile of data
+# collection intervals changes model results
+speed_het_sub <- fit_mod(move_sub, 'hab_contrast_sc', '(hab_contrast_sc | taxon/study)', 'speed_log')
+speed_simps_sub <- fit_mod(move_sub, 'simpsons_D_sc', '(simpsons_D_sc | taxon/study)', 'speed_log')
+hr_het_sub <- fit_mod(move_sub, 'hab_contrast_sc', '(hab_contrast_sc | taxon/study)', 'hr_area_log')
+hr_simps_sub <- fit_mod(move_sub, 'simpsons_D_sc', '(simpsons_D_sc | taxon/study)', 'hr_area_log')
+hr_pet_sub <- fit_mod(move_sub, 'pet_sc', '(pet_sc | taxon/study)', 'hr_area_log')
+speed_pet_sub <- fit_mod(move_sub, 'pet_sc', '(pet_sc | taxon/study)', 'speed_log')
+hr_het_mm <- fit_mod(move_dat, 'hab_contrast_sc*move_mode', '(hab_contrast_sc | taxon/study)', 'hr_area_log')
+hr_simps_mm <- fit_mod(move_dat, 'simpsons_D_sc*move_mode', '(simpsons_D_sc | taxon/study)', 'hr_area_log')
 
-speed_het_fixed <- speed_het %>%
-  spread_draws(b_hab_contrast_sc) %>%
-  median_qi(b_hab_contrast_sc) %>%
-  rename('slope' = b_hab_contrast_sc) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Habitat contrast',
-         response = 'speed')
+# Fit models to test effects of movement mode
+# Movement mode on ground reduces speed but no effect of interaction with PET on speed
+speed_het_mm <- fit_mod(move_dat, 'hab_contrast_sc*move_mode', '(hab_contrast_sc | taxon/study)', 'speed_log')
+speed_pet_mm <- fit_mod(move_dat, 'pet_sc*move_mode', '(pet_sc | taxon/study)', 'speed_log')
+speed_simps_mm <- fit_mod(move_dat, 'simpsons_D_sc*move_mode', '(simpsons_D_sc | taxon/study)', 'speed_log')
+hr_pet_mm <- fit_mod(move_dat, 'pet_sc*move_mode', '(pet_sc | taxon/study)', 'hr_area_log')
+# Fit models to test effects of adult body mass
+speed_simps_bm <- fit_mod(move_dat, 'simpsons_D_sc*adult_mass_g_sc', 
+                          '(simpsons_D_sc | taxon/study)', 'speed_log')
+speed_het_bm <- fit_mod(move_dat, 'hab_contrast_sc*adult_mass_g_sc', 
+                        '(hab_contrast_sc | taxon/study)', 'speed_log')
+speed_pet_bm <- fit_mod(move_dat, 'pet_sc*adult_mass_g_sc', 
+                        '(pet_sc | taxon/study)', 'speed_log')
+hr_het_bm <- fit_mod(move_dat, 'hab_contrast_sc*adult_mass_g_sc', 
+                     '(hab_contrast_sc | taxon/study)', 'hr_area_log')
+hr_simps_bm <- fit_mod(move_dat, 'simpsons_D_sc*adult_mass_g_sc', 
+                       '(simpsons_D_sc | taxon/study)', 'hr_area_log')
+hr_pet_bm <- fit_mod(move_dat, 'pet_sc*adult_mass_g_sc', 
+                     '(pet_sc | taxon/study)', 'hr_area_log')
 
-speed_simps_fixed <- speed_simps %>%
-  spread_draws(b_simpsons_D_sc) %>%
-  median_qi(b_simpsons_D_sc) %>%
-  rename('slope' = b_simpsons_D_sc) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Habitat diversity',
-         response = 'speed')
+# Body size and movement mode alone
+move_speed <- fit_mod(move_dat, 'move_mode', NULL, 'speed_log')
+body_size_speed <- fit_mod(move_dat, 'adult_mass_g_sc', NULL, 'speed_log')
+move_hr <- fit_mod(move_dat, 'move_mode', NULL, 'hr_area_log')
+body_size_hr <- fit_mod(move_dat, 'adult_mass_g_sc', NULL, 'hr_area_log')
 
-hr_het_fixed <- hr_het %>%
-  spread_draws(b_hab_contrast_sc) %>%
-  median_qi(b_hab_contrast_sc) %>%
-  rename('slope' = b_hab_contrast_sc) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Habitat contrast',
-         response = 'hr')
+# SAVE main text models
+saveRDS(speed_het, 'model_files/main/speed_het.rds')
+saveRDS(speed_simps, 'model_files/main/speed_simps.rds')
+saveRDS(speed_pet, 'model_files/main/speed_pet.rds')
+saveRDS(hr_het, 'model_files/main/hr_het.rds')
+saveRDS(hr_simps, 'model_files/main/hr_simps.rds')
+saveRDS(hr_pet, 'model_files/main/hr_pet.rds')
+saveRDS(fst_disp, 'model_files/main/fst_disp.rds')
+saveRDS(fst_hr, 'model_files/main/fst_hr.rds')
 
-hr_simps_fixed <- hr_simps %>%
-  spread_draws(b_simpsons_D_sc) %>%
-  median_qi(b_simpsons_D_sc) %>%
-  rename('slope' = b_simpsons_D_sc) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Habitat diversity',
-         response = 'hr')
-
-# Bind together
-all_fixed_vars <- speed_het_fixed %>%
-  rbind(speed_simps_fixed) %>%
-  rbind(hr_het_fixed) %>%
-  rbind(hr_simps_fixed)
-
-# Same for individual slopes... maybe rename the variable in the function?
-# Individual slopes
-speed_het_vars <- speed_het %>%
-  spread_draws(b_hab_contrast_sc, r_taxon[study, term]) %>%
-  mutate(species_m = b_hab_contrast_sc + r_taxon) %>%
-  filter(term == 'hab_contrast_sc') %>%
-  arrange(study) %>%
-  group_by(study) %>% 
-  summarize(mean_slope = mean(species_m), se_slope = sd(species_m)/sqrt(length(species_m))*1.96) %>%
-  mutate(var = 'Habitat contrast',
-         response = 'speed') %>%
-  rename('taxon' = study) %>%
-  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial'))
-
-speed_simps_vars <- speed_simps %>%
-  spread_draws(b_simpsons_D_sc, r_taxon[study, term]) %>%
-  mutate(species_m = b_simpsons_D_sc + r_taxon) %>%
-  filter(term == 'simpsons_D_sc') %>%
-  arrange(study) %>%
-  group_by(study) %>% 
-  summarize(mean_slope = mean(species_m), se_slope = sd(species_m)/sqrt(length(species_m))*1.96) %>%
-  mutate(var = 'Habitat diversity',
-         response = 'speed') %>%
-  rename('taxon' = study) %>%
-  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial'))
-
-hr_het_vars <- hr_het %>%
-  spread_draws(b_hab_contrast_sc, r_taxon[study, term]) %>%
-  mutate(species_m = b_hab_contrast_sc + r_taxon) %>%
-  filter(term == 'hab_contrast_sc') %>%
-  arrange(study) %>%
-  group_by(study) %>% 
-  summarize(mean_slope = mean(species_m), se_slope = sd(species_m)/sqrt(length(species_m))*1.96) %>%
-  mutate(var = 'Habitat contrast',
-         response = 'hr') %>%
-  rename('taxon' = study) %>%
-  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial'))
-
-hr_simps_vars <- hr_simps %>%
-  spread_draws(b_simpsons_D_sc, r_taxon[study, term]) %>%
-  mutate(species_m = b_simpsons_D_sc + r_taxon) %>%
-  filter(term == 'simpsons_D_sc') %>%
-  arrange(study) %>%
-  group_by(study) %>% 
-  summarize(mean_slope = mean(species_m), se_slope = sd(species_m)/sqrt(length(species_m))*1.96) %>%
-  mutate(var = 'Habitat diversity',
-         response = 'hr') %>%
-  rename('taxon' = study) %>%
-  mutate(lifestyle = ifelse(taxon %in% bats, 'bat', 'terrestrial'))
-
-# Bind together
-all_rand_vars <- speed_het_vars %>%
-  rbind(speed_simps_vars) %>%
-  rbind(hr_het_vars) %>%
-  rbind(hr_simps_vars) %>%
-  left_join(panther)
-
-# Save models
-saveRDS(speed_het, 'model_files/speed_het.rds')
-saveRDS(speed_simps, 'model_files/speed_simps.rds')
-saveRDS(speed_pet, 'model_files/speed_pet.rds')
-saveRDS(hr_het, 'model_files/hr_het.rds')
-saveRDS(hr_simps, 'model_files/hr_simps.rds')
-saveRDS(hr_pet, 'model_files/hr_pet.rds')
-saveRDS(fst_disp, 'model_files/fst_disp.rds')
-saveRDS(fst_hr, 'model_files/fst_hr.rds')
-
-# Save posterior draws
-saveRDS(all_fixed_vars, 'output/movement_fixed_draws.rds')
-saveRDS(all_rand_vars, 'output/movement_rand_draws.rds')
-saveRDS(draws_fst_disp, 'output/fst_disp_draws.rds')
-saveRDS(draws_fst_hr, 'output/fst_hr_draws.rds')
+# SAVE supplementary model checks and subanalyses
+# Checks for speed and home range size
+saveRDS(hr_check, 'model_files/supplement/supplement_hr_check.rds')
+saveRDS(speed_check, 'model_files/supplement/supplement_speed_check.rds')
+# Sub models
+saveRDS(speed_het_sub, 'model_files/supplement/speed_het_sub.rds')
+saveRDS(speed_simps_sub, 'model_files/supplement/speed_simps_sub.rds')
+saveRDS(speed_pet_sub, 'model_files/supplement/speed_pet_sub.rds')
+saveRDS(hr_het_sub, 'model_files/supplement/hr_het_sub.rds')
+saveRDS(hr_pet_sub, 'model_files/supplement/hr_pet_sub.rds')
+saveRDS(hr_simps_sub, 'model_files/supplement/hr_simps_sub.rds')
+# Movement mode effects
+saveRDS(speed_pet_mm, 'model_files/supplement/speed_pet_mm.rds')
+saveRDS(speed_het_mm, 'model_files/supplement/speed_het_mm.rds')
+saveRDS(speed_simps_mm, 'model_files/supplement/speed_simps_mm.rds')
+saveRDS(hr_het_mm, 'model_files/supplement/hr_het_mm.rds')
+saveRDS(hr_simps_mm, 'model_files/supplement/hr_simps_mm.rds')
+saveRDS(hr_pet_mm, 'model_files/supplement/hr_pet_mm.rds')
+# Body mass effects
+saveRDS(speed_simps_bm, 'model_files/supplement/speed_simps_bm.rds')
+saveRDS(hr_het_bm, 'model_files/supplement/hr_het_bm.rds')
+saveRDS(hr_simps_bm, 'model_files/supplement/hr_simps_bm.rds')
+saveRDS(hr_pet_bm, 'model_files/supplement/hr_pet_bm.rds')
+saveRDS(speed_het_bm, 'model_files/supplement/speed_het_bm.rds')
+saveRDS(speed_pet_bm, 'model_files/supplement/speed_pet_bm.rds')
 
