@@ -5,16 +5,15 @@
 library(tidyverse)
 library(move)
 
-# Movebank credentials
-mv_creds <- movebankLogin('levi_newediuk', 'COWelk2019')
-
 # Get list of Movebank data with download access
+# Note: mv_creds = Movebank credentials for used
 MV_dat <- getMovebank('study', login = mv_creds) %>%
   filter(i_have_download_access == 'true')
 
 # Get only taxa and study ID
 MV_taxa <- MV_dat %>%
-  dplyr::select(id, taxon_ids, number_of_individuals) %>%
+  dplyr::select(id, taxon_ids, number_of_individuals, 
+                main_location_lat, main_location_long) %>%
   rename('n_indivs' = number_of_individuals) %>%
   # Separate each taxon separated by column into a new row
   separate_rows(taxon_ids, sep = ',') 
@@ -59,8 +58,14 @@ MV_mamms <- MV_taxa %>%
          # Remove these studies for now because files too large
          ! id %in% c(7023252, 53460105))
 
+
+# Get locations of studies
+MV_locs <- MV_mamms %>% 
+  dplyr::select(id, main_location_lat, main_location_long)
+
 # Save list of studies from which to download data
 saveRDS(MV_mamms, 'output/mammal_studies.rds')
+saveRDS(MV_locs, 'output/mammal_study_locs.rds')
 
 
 

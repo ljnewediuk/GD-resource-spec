@@ -5,12 +5,6 @@
 library(tidyverse)
 library(move)
 
-# Movebank credentials
-mv_creds <- movebankLogin('levi_newediuk', 'COWelk2019')
-
-# Load study IDs
-MV_mamms <- readRDS('output/mammal_studies.rds')
-
 # Source HMM function
 source('functions/GetMovementLocs.R') 
 
