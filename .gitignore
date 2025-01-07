@@ -3,14 +3,11 @@
 .Rapp.history
 
 # Large data folders
-input/
+extras/
+figures/
 output/
-hmm_files/
 move_files/
 model_files/
-sf_files/
-microsat_data/
-figures/
 
 # Session Data files
 .RData
