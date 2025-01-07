@@ -9,9 +9,6 @@ source('functions/SummarizeMovement.R')
 source('functions/SummarizeHomeRanges.R')
 source('functions/BufferLandscape.R')
 
-# Set up Earth Engine credentials
-ee_Initialize(user = 'j.newedi@gmail.com', drive = TRUE)
-
 # List of studies with movement data
 studies <- list.files('move_files/')
 

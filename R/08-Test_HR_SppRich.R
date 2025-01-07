@@ -56,7 +56,9 @@ hrs_total <- bind_rows(hr_indivs, hr_pops, hr_grps) %>%
   # Remove any NAs and species with < 2 populations
   mutate(N_pops = n()) %>%
   # filter(! N_pops < 2) %>%
-  na.omit()
+  na.omit() %>%
+  # Remove domestic species
+  filter(! Species %in% c('Capra hircus', 'Felis catus'))
 
 # Extract species richness from rasters ====
 #

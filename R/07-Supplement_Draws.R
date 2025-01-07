@@ -87,32 +87,6 @@ mm_draws <- mm_draws %>%
   rbind(speed_simps_mm_fly) %>%
   rbind(speed_simps_mm_gr)
 
-# Speed ~ Potential evapotranspiration*movement mode
-# Movement mode flying
-speed_pet_mm_fly <- speed_pet_mm %>%
-  spread_draws(b_pet_sc) %>%
-  median_qi(b_pet_sc) %>%
-  rename('slope' = b_pet_sc) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Potential evapotranspiration',
-         response = 'speed',
-         mm = 'flying')
-# Movement mode ground
-speed_pet_mm_gr <- speed_pet_mm %>%
-  spread_draws(b_pet_sc, `b_pet_sc:move_modeground`) %>%
-  mutate(b_gr = b_pet_sc + `b_pet_sc:move_modeground`) %>%
-  median_qi(b_gr) %>%
-  rename('slope' = b_gr) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Potential evapotranspiration',
-         response = 'speed',
-         mm = 'ground')
-
-# Bind with effect sizes
-mm_draws <- mm_draws %>% 
-  rbind(speed_pet_mm_fly) %>%
-  rbind(speed_pet_mm_gr)
-
 # Home range size ~ habitat heterogeneity*movement mode
 # Movement mode flying
 hr_het_mm_fly <- hr_het_mm %>%
@@ -164,33 +138,6 @@ hr_simps_mm_gr <- hr_simps_mm %>%
 mm_draws <- mm_draws %>% 
   rbind(hr_simps_mm_fly) %>%
   rbind(hr_simps_mm_gr)
-
-# Speed ~ Potential evapotranspiration*movement mode
-# Movement mode flying
-hr_pet_mm_fly <- hr_pet_mm %>%
-  spread_draws(b_pet_sc) %>%
-  median_qi(b_pet_sc) %>%
-  rename('slope' = b_pet_sc) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Potential evapotranspiration',
-         response = 'hr',
-         mm = 'flying')
-# Movement mode ground
-hr_pet_mm_gr <- hr_pet_mm %>%
-  spread_draws(b_pet_sc, `b_pet_sc:move_modeground`) %>%
-  mutate(b_gr = b_pet_sc + `b_pet_sc:move_modeground`) %>%
-  median_qi(b_gr) %>%
-  rename('slope' = b_gr) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Potential evapotranspiration',
-         response = 'hr',
-         mm = 'ground')
-
-# Bind with effect sizes
-mm_draws <- mm_draws %>% 
-  rbind(hr_pet_mm_fly) %>%
-  rbind(hr_pet_mm_gr)
-
 
 # POPULATION EFFECTS FROM BODY SIZE MODELS
 
@@ -250,33 +197,6 @@ bm_draws <- bm_draws %>%
   rbind(speed_simps_bm_noint) %>%
   rbind(speed_simps_bm_int)
 
-# Speed ~ Potential evapotranspiration*body mass
-# Without interaction
-speed_pet_bm_noint <- speed_pet_bm %>%
-  spread_draws(b_pet_sc) %>%
-  median_qi(b_pet_sc) %>%
-  rename('slope' = b_pet_sc) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Potential evapotranspiration',
-         response = 'speed',
-         bm_effect = 'no')
-
-# With interaction
-speed_pet_bm_int <- speed_pet_bm %>%
-  spread_draws(b_pet_sc, `b_pet_sc:adult_mass_g_sc`) %>%
-  mutate(b_gr = b_pet_sc + `b_pet_sc:adult_mass_g_sc`) %>%
-  median_qi(b_gr) %>%
-  rename('slope' = b_gr) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Potential evapotranspiration',
-         response = 'speed',
-         bm_effect = 'yes')
-
-# Bind with effect sizes
-bm_draws <- bm_draws %>% 
-  rbind(speed_pet_bm_noint) %>%
-  rbind(speed_pet_bm_int)
-
 # Home range size ~ habitat heterogeneity*body mass
 # Without interaction
 hr_het_bm_noint <- hr_het_bm %>%
@@ -330,33 +250,6 @@ bm_draws <- bm_draws %>%
   rbind(hr_simps_bm_noint) %>%
   rbind(hr_simps_bm_int)
 
-# Speed ~ Potential evapotranspiration*body mass
-# Without interaction
-hr_pet_bm_noint <- hr_pet_bm %>%
-  spread_draws(b_pet_sc) %>%
-  median_qi(b_pet_sc) %>%
-  rename('slope' = b_pet_sc) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Potential evapotranspiration',
-         response = 'hr',
-         bm_effect = 'no')
-
-# With interaction
-hr_pet_bm_int <- hr_pet_bm %>%
-  spread_draws(b_pet_sc, `b_pet_sc:adult_mass_g_sc`) %>%
-  mutate(b_gr = b_pet_sc + `b_pet_sc:adult_mass_g_sc`) %>%
-  median_qi(b_gr) %>%
-  rename('slope' = b_gr) %>%
-  select(slope, .lower, .upper) %>%
-  mutate(var = 'Potential evapotranspiration',
-         response = 'hr',
-         bm_effect = 'yes')
-
-# Bind with effect sizes
-bm_draws <- bm_draws %>% 
-  rbind(hr_pet_bm_noint) %>%
-  rbind(hr_pet_bm_int)
-
 # HYPOTHESIS TESTING
 
 # Hypothesis testing for interaction effect in movement mode model
@@ -364,42 +257,30 @@ speed_het_mm_hyp <- hypothesis(speed_het_mm, '`hab_contrast_sc:move_modeground` 
   mutate(var = 'Habitat contrast', response = 'speed')
 speed_simps_mm_hyp <- hypothesis(speed_simps_mm, '`simpsons_D_sc:move_modeground` > 0')[['hypothesis']] %>%
   mutate(var = 'Habitat diversity', response = 'speed')
-speed_pet_mm_hyp <- hypothesis(speed_pet_mm, '`pet_sc:move_modeground` > 0')[['hypothesis']] %>%
-  mutate(var = 'Potential evapotranspiration', response = 'speed')
 hr_het_mm_hyp <- hypothesis(hr_het_mm, '`hab_contrast_sc:move_modeground` > 0')[['hypothesis']] %>%
   mutate(var = 'Habitat contrast', response = 'hr')
 hr_simps_mm_hyp <- hypothesis(hr_simps_mm, '`simpsons_D_sc:move_modeground` > 0')[['hypothesis']] %>%
   mutate(var = 'Habitat diversity', response = 'hr')
-hr_pet_mm_hyp <- hypothesis(hr_pet_mm, '`pet_sc:move_modeground` > 0')[['hypothesis']] %>%
-  mutate(var = 'Potential evapotranspiration', response = 'hr')
 # Bind together
 mm_hyps <- speed_het_mm_hyp %>%
   rbind(speed_simps_mm_hyp) %>%
-  rbind(speed_pet_mm_hyp) %>%
   rbind(hr_het_mm_hyp) %>%
-  rbind(hr_simps_mm_hyp) %>%
-  rbind(hr_pet_mm_hyp)
+  rbind(hr_simps_mm_hyp)
 
 # Hypothesis testing for interaction effect in body mass model
 speed_het_bm_hyp <- hypothesis(speed_het_bm, '`hab_contrast_sc:adult_mass_g_sc` > 0')[['hypothesis']] %>%
   mutate(var = 'Habitat contrast', response = 'speed')
 speed_simps_bm_hyp <- hypothesis(speed_simps_bm, '`simpsons_D_sc:adult_mass_g_sc` > 0')[['hypothesis']] %>%
   mutate(var = 'Habitat diversity', response = 'speed')
-speed_pet_bm_hyp <- hypothesis(speed_pet_bm, '`pet_sc:adult_mass_g_sc` > 0')[['hypothesis']] %>%
-  mutate(var = 'Potential evapotranspiration', response = 'speed')
 hr_het_bm_hyp <- hypothesis(hr_het_bm, '`hab_contrast_sc:adult_mass_g_sc` > 0')[['hypothesis']] %>%
   mutate(var = 'Habitat contrast', response = 'hr')
 hr_simps_bm_hyp <- hypothesis(hr_simps_bm, '`simpsons_D_sc:adult_mass_g_sc` > 0')[['hypothesis']] %>%
   mutate(var = 'Habitat diversity', response = 'hr')
-hr_pet_bm_hyp <- hypothesis(hr_pet_bm, '`pet_sc:adult_mass_g_sc` > 0')[['hypothesis']] %>%
-  mutate(var = 'Potential evapotranspiration', response = 'hr')
 # Bind together
 bm_hyps <- speed_het_bm_hyp %>%
   rbind(speed_simps_bm_hyp) %>%
-  rbind(speed_pet_bm_hyp) %>%
   rbind(hr_het_bm_hyp) %>%
-  rbind(hr_simps_bm_hyp) %>%
-  rbind(hr_pet_bm_hyp)
+  rbind(hr_simps_bm_hyp)
 
 # SAVE DRAWS AND TESTS
 saveRDS(bm_draws, 'output/body_mass_model_draws.rds')
