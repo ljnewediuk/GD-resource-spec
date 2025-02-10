@@ -1,11 +1,12 @@
 
+# 08 Get species richness data ====
+# This script is to make the data used for MEMs, taking point estimates
+# of species richness at locations of home range size estimates
+
 library(stars)
 library(tidyverse)
 library(ggspatial)
 library(rnaturalearth)
-
-# This script is to make the data used for MEMs, taking point estimates
-# of species richness at locations of home range size estimates
 
 # Load the home range size data
 home_range <- read.csv('input/HomeRangeData_2023_09_06.csv')

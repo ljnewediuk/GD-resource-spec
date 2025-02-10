@@ -1,4 +1,8 @@
 
+# 09 MEMs ====
+# Make MEM maps and calculate shared variation between species richness and 
+# home range size
+
 library(tidyverse)
 library(sf)
 library(vegan)

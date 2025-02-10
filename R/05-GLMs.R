@@ -1,14 +1,11 @@
 
-library(tidyverse)
-library(tidybayes)
-library(brms)
-library(emmeans)
-library(modelr)
-library(bayestestR)
-library(performance)
-
-# 06 Models ====
+# 05 GLM Models ====
 # Model movement (speed and HR area) on heterogeneity
+
+libs <- list('tidyverse', 'tidybayes', 'brms', 'emmeans', 
+             'modelr', 'bayestestR', 'performance')
+
+lapply(libs, require, character.only = T)
 
 # Load movement ~ environment data
 move_dat <- readRDS('output/prepped_data.rds')

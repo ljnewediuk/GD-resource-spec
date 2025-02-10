@@ -1,12 +1,12 @@
 
+# 10 Main Plots ====
+# Orchard plots of movement ~ environment
+# Scatterplot of Fst ~ environment
+
 library(tidyverse)
 library(cowplot)
 library(png)
 library(rnaturalearth)
-
-# 09 Main Plots ====
-# Orchard plots of movement ~ environment
-# Scatterplot of Fst ~ environment
 
 # Load data
 rand_vars <- readRDS('output/movement_rand_draws.rds') %>%

@@ -60,7 +60,3 @@ for(i in unique(MV_mamms$id)) {
   
 }
 
-
-
-
-

@@ -1,11 +1,11 @@
 
-library(tidyverse)
-library(tidybayes)
-library(brms)
-library(emmeans)
-library(modelr)
-library(bayestestR)
-library(performance)
+# 06 Posterior draws ====
+# Get posterior draws from main models to summarize/plot 
+
+libs <- list('tidyverse', 'tidybayes', 'brms', 'emmeans', 
+             'modelr', 'bayestestR', 'performance')
+
+lapply(libs, require, character.only = T)
 
 # List models
 mod_file_names_m <- list.files('model_files/main')

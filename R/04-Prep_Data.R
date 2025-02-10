@@ -1,9 +1,8 @@
 
+# 04 Prep data movement and landscape ====
+# Combine movement data with landscape data for plots and models
 
 library(tidyverse)
-
-# 05 Prep data movement and landscape ====
-# Combine movement data with landscape data for plots and models
 
 # Load and prep data for movement ~ landscape models
 

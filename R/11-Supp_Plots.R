@@ -1,9 +1,9 @@
 
+# 11 Supplementary Plots ====
+# Supplementary orchard plots
+
 library(tidyverse)
 library(cowplot)
-
-# 10 Supplementary Plots ====
-# Supplementary orchard plots
 
 # Load data
 

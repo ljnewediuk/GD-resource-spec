@@ -1,5 +1,5 @@
 
-# 04 Landscape Movement Metrics ====
+# 03 Landscape Movement Metrics ====
 # Summarize movement metrics and environmental characteristics for each individual
 # in Movebank data
 
